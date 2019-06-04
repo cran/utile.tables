@@ -1,0 +1,15 @@
+35bf15e234d0ee4cfc12e169c80c4e51 *DESCRIPTION
+2e4b42f4586f7ac8a48845abcf4f2b4d *NAMESPACE
+1ec4a4eece9ed0e21d056f1b10c560d6 *R/build_event_row.R
+9dff3f49f132a75db36eafe16583950b *R/build_event_table.R
+5dc4ca9db6a9c0b7109380ee3a72a720 *R/build_row.R
+00a683eb8a159bc9e49a102c36dfdcdc *R/build_table.R
+a5c8afb2b45c43417ef302ccf5ea98ba *R/utils.R
+9119c65ebad62d16e6bbaad19c85b609 *README.md
+fa6c6559375b183a3c47766af528616c *man/build_event_row.Rd
+162e97d62e01b3337f1cfb940c5d91cc *man/build_event_row_.Rd
+85a250ec5a028aa7127ae7f7814a96a5 *man/build_event_table.Rd
+05ef82105aeb3d88556a0c58a57cba53 *man/build_footer.Rd
+8a2d308da21f8402c7ad5ccee8cbda88 *man/build_row.Rd
+951d7d08334429160f4479f342ce3fc9 *man/build_row_.Rd
+c3714490c080f69b7ff3ed31aff739b3 *man/build_table.Rd
