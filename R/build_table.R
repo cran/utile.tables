@@ -57,7 +57,7 @@ build_table <- function(
 ) {
 
   # Hard stops
-  if (!tibble::is.tibble(data)) stop('No usable tibble found. [check: data]')
+  if (!tibble::is_tibble(data)) stop('No usable tibble found. [check: data]')
 
   # Check 'by' column
   if (!is.null(by)) {

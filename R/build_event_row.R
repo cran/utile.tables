@@ -6,10 +6,11 @@ utils::globalVariables(c('.mv', '.fit', '.data'))
 #' @param label Optional. Character. Row name to print in the table. Defaults to value of \'col\' parameter.
 #' @param col Required. Character. Name of column used as a parameter in the tiem-to-event function.
 #' @param fit Required. survival::coxph().
+#' @param percent.sign Optional. Logical. Indicates percent sign should be printed
+#' for frequencies. Defaults to TRUE.
 #' @param digits Optional. Integer. Number of digits to round numerics to. Defaults to 1.
 #' @param p.digits Optional. Integer. Number of digits to print for p-value. Note that p-values are still
 #' rounded based on the \'digits\' parameter. Defaults to 4.
-#' @param percent.sign Optional. Logical. Whether to print percent sign for frequencies. Defaults to FALSE.
 #' @param indent Optional. Logical. Indent a variable labels. Defaults to FALSE.
 #' @return Data is returned in the form of a tibble containing a row for the specified parameter.
 #' @examples
@@ -47,19 +48,16 @@ utils::globalVariables(c('.mv', '.fit', '.data'))
 #' @export
 build_event_row <- function(
   .table = NULL, label = NULL, col = NULL,
-  fit = NULL, digits = 1, p.digits = 4,
-  percent.sign = FALSE, indent = FALSE
+  fit = NULL, percent.sign = TRUE, digits = 1,
+  p.digits = 4, indent = FALSE
 ) {
-  # Log
-  message(paste0('Summarizing: \'', if (!is.null(label)) label else if (!is.null(col)) col else '...', '\''))
-
   # Tabulate row data
   if (!is.null(col)) {
     if (is.null(label)) label <- col
     if (indent) label <- paste0('   ', label)
     table <- .row_coxph(
       label = label, col = col, fit = fit,
-      digits = digits, p.digits = p.digits, percent.sign = percent.sign
+      percent.sign = percent.sign, digits = digits, p.digits = p.digits
     )
   } else if (!is.null(label)) table <- tibble::tribble(~Variable, ifelse(indent, paste0('   ', label), label))
   else table <- NULL
@@ -80,10 +78,11 @@ build_event_row <- function(
 #' must contain a survival::Surv() object as first term. All terms must be present in data.
 #' @param data Semi-optional. Tibble. Contains data for time-to-event model. Only required
 #' if \'fit\' is a formula.
+#' @param percent.sign Optional. Logical. Indicates percent sign should be printed
+#' for frequencies. Defaults to TRUE.
 #' @param digits Optional. Integer. Number of digits to round numerics to. Defaults to 1.
 #' @param p.digits Optional. Integer. Number of digits to print for p-values. Note that p-values are
 #' still rounded based on \'digits\' parameter. Defaults to 4.
-#' @param percent.sign Optional. Logical. Whether to print percent sign for frequencies. Defaults to FALSE.
 #' @param indent Optional. Logical. Indent a variable labels. Defaults to FALSE.
 #' @return A custom build_event_row() function. See related documentation for behavior.
 #' @examples
@@ -105,14 +104,14 @@ build_event_row <- function(
 #' row(label = 'Sex', col = 'sex') %>%
 #' row(label = 'Institution', col = 'inst')
 #' @export
-build_event_row_ <- function(fit, data, digits, p.digits, percent.sign, indent) {
+build_event_row_ <- function(fit, data, percent.sign, digits, p.digits, indent) {
   UseMethod('build_event_row_')
 }
 
 
 .build_event_row_ <- function(
-  fit = NULL, data = NULL, digits = 1,
-  p.digits = 4, percent.sign = FALSE, indent = FALSE
+  fit = NULL, data = NULL, percent.sign = TRUE,
+  digits = 1, p.digits = 4, indent = FALSE
 ) {
   # Extract formula variables
   fit_vars <- all.vars(fit)
@@ -137,16 +136,16 @@ build_event_row_ <- function(fit, data, digits, p.digits, percent.sign, indent) 
   message('Parameter defaults:')
   message(paste0('  - fit = ', .fit))
   message('  - data = data')
+  message(paste0('  - percent.sign = ', .percent.sign))
   message(paste0('  - digits = ', .digits))
   message(paste0('  - p.digits = ', .p.digits))
-  message(paste0('  - percent.sign = ', .percent.sign))
   message(paste0('  - indent = ', .indent))
 
   # Return working function
   function(
     .table = NULL, label = NULL, col = NULL,
-    fit = .fit, data = .data, digits = .digits,
-    p.digits = .p.digits, percent.sign = .percent.sign, indent = .indent
+    fit = .fit, data = .data, percent.sign = .percent.sign,
+    digits = .digits, p.digits = .p.digits, indent = .indent
   ) {
     if (!is.null(col)) {
       if (!is.numeric(data[[col]]) & !is.factor(data[[col]]) & !is.logical(data[[col]]))
@@ -171,8 +170,8 @@ build_event_row_ <- function(fit, data, digits, p.digits, percent.sign, indent) 
                 ),
                 data = data,
               ),
-              digits = digits, p.digits = p.digits,
-              percent.sign = percent.sign, indent = indent
+              percent.sign = percent.sign, digits = digits,
+              p.digits = p.digits, indent = indent
             )
           )
         )
@@ -187,17 +186,16 @@ build_event_row_.formula <- .build_event_row_
 
 #' @export
 build_event_row_.coxph <- function(
-  fit = NULL, data = NULL, digits = 1,
-  p.digits = 4, percent.sign = FALSE, indent = indent
+  fit = NULL, data = NULL, percent.sign = TRUE,
+  digits = 1, p.digits = 4, indent = indent
 ) {
   # Extract data and formula from survival object
   if (is.null(data)) data <- eval(fit$call$data)
   fit <- stats::formula(fit)
 
   .build_event_row_(
-    fit = fit, data = data, digits = digits,
-    p.digits = p.digits, percent.sign = percent.sign,
-    indent = indent
+    fit = fit, data = data, percent.sign = percent.sign,
+    digits = digits, p.digits = p.digits, indent = indent
   )
 }
 

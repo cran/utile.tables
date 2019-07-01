@@ -15,10 +15,11 @@ utils::globalVariables(c(
 #' @param skip Optional. Character. Names of columns to skip as part of predictor testing.
 #' @param mv Optional. Logical. Indicates provided \'cols\' should be tested as part of one
 #' multi-variate model. Defaults to FALSE (univariate; seperate models).
+#' @param percent.sign Optional. Logical. Indicates percent sign should be printed
+#' for frequencies. Defaults to TRUE.
 #' @param digits Optional. Integer. Number of digits to round numerics to. Defaults to 1.
 #' @param p.digits Optional. Integer. Number of digits to print for p-values. Note that p-values are
 #' still rounded based on \'digits\' parameter. Defaults to 4.
-#' @param percent.sign Optional. Logical. Whether to print percent sign for frequencies. Defaults to FALSE.
 #' @return Data is returned in the form of a tibble containing a row for each parameter.
 #' @examples
 #' library(survival)
@@ -35,15 +36,15 @@ utils::globalVariables(c(
 #' # Automatically model all parameters together
 #' build_event_table(Surv(time, status) ~ 1, skip = 'inst', mv = TRUE, data = data_lung)
 #' @export
-build_event_table <- function(fit, data, cols, skip, mv, digits, p.digits, percent.sign) {
+build_event_table <- function(fit, data, cols, skip, mv, percent.sign, digits, p.digits) {
   UseMethod('build_event_table')
 }
 
 
 .build_event_table <- function(
   fit = NULL, data = NULL, cols = NULL,
-  skip = NULL, mv = FALSE, digits = 1,
-  p.digits = 4, percent.sign = FALSE
+  skip = NULL, mv = FALSE, percent.sign = TRUE,
+  digits = 1, p.digits = 4
 ) {
 
   fit_vars <- all.vars(fit)
@@ -87,9 +88,9 @@ build_event_table <- function(fit, data, cols, skip, mv, digits, p.digits, perce
           ),
           data = data,
         ),
+        percent.sign = percent.sign,
         digits = digits,
-        p.digits = p.digits,
-        percent.sign = percent.sign
+        p.digits = p.digits
       )
     }
   }
@@ -106,8 +107,8 @@ build_event_table.formula <- .build_event_table
 #' @export
 build_event_table.coxph <- function(
   fit = NULL, data = NULL, cols = NULL,
-  skip = NULL, mv = FALSE, digits = 1,
-  p.digits = 4, percent.sign = FALSE
+  skip = NULL, mv = FALSE, percent.sign = TRUE,
+  digits = 1, p.digits = 4
 ) {
   # Seperate data and formula from survival object
   if (is.null(data)) data <- eval(fit$call$data)
@@ -115,8 +116,8 @@ build_event_table.coxph <- function(
 
   .build_event_table(
     fit = fit, data = data,cols = cols,
-    skip = skip, mv = mv, digits = digits,
-    p.digits = p.digits, percent.sign = percent.sign
+    skip = skip, mv = mv, percent.sign = percent.sign,
+    digits = digits, p.digits = p.digits
   )
 }
 

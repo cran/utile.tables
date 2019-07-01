@@ -4,7 +4,7 @@
 \alias{build_event_row_}
 \title{build_event_row_}
 \usage{
-build_event_row_(fit, data, digits, p.digits, percent.sign, indent)
+build_event_row_(fit, data, percent.sign, digits, p.digits, indent)
 }
 \arguments{
 \item{fit}{Required. Formula, survival::survfit(), survival::coxph(). The formula
@@ -13,12 +13,13 @@ must contain a survival::Surv() object as first term. All terms must be present 
 \item{data}{Semi-optional. Tibble. Contains data for time-to-event model. Only required
 if \'fit\' is a formula.}
 
+\item{percent.sign}{Optional. Logical. Indicates percent sign should be printed
+for frequencies. Defaults to TRUE.}
+
 \item{digits}{Optional. Integer. Number of digits to round numerics to. Defaults to 1.}
 
 \item{p.digits}{Optional. Integer. Number of digits to print for p-values. Note that p-values are
 still rounded based on \'digits\' parameter. Defaults to 4.}
-
-\item{percent.sign}{Optional. Logical. Whether to print percent sign for frequencies. Defaults to FALSE.}
 
 \item{indent}{Optional. Logical. Indent a variable labels. Defaults to FALSE.}
 }

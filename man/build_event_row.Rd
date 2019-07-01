@@ -5,7 +5,7 @@
 \title{build_event_row}
 \usage{
 build_event_row(.table = NULL, label = NULL, col = NULL,
-  fit = NULL, digits = 1, p.digits = 4, percent.sign = FALSE,
+  fit = NULL, percent.sign = TRUE, digits = 1, p.digits = 4,
   indent = FALSE)
 }
 \arguments{
@@ -17,12 +17,13 @@ build_event_row(.table = NULL, label = NULL, col = NULL,
 
 \item{fit}{Required. survival::coxph().}
 
+\item{percent.sign}{Optional. Logical. Indicates percent sign should be printed
+for frequencies. Defaults to TRUE.}
+
 \item{digits}{Optional. Integer. Number of digits to round numerics to. Defaults to 1.}
 
 \item{p.digits}{Optional. Integer. Number of digits to print for p-value. Note that p-values are still
 rounded based on the \'digits\' parameter. Defaults to 4.}
-
-\item{percent.sign}{Optional. Logical. Whether to print percent sign for frequencies. Defaults to FALSE.}
 
 \item{indent}{Optional. Logical. Indent a variable labels. Defaults to FALSE.}
 }

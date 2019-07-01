@@ -71,17 +71,14 @@ build_row <- function(
   less.than.one = FALSE, remove.na = TRUE, label.stats = TRUE,
   digits = 1, p.digits = 4, ...
 ) {
-  # Log
-  message(paste0('Summarizing: \'', if (!is.null(label)) label else if (!is.null(col)) col else 'n', '\''))
-
   # Hard stops
-  if (is.null(data) & !is.character(data) & !tibble::is.tibble(data)) stop('No data found. [check: data]')
+  if (is.null(data) & !is.character(data) & !tibble::is_tibble(data)) stop('No data found. [check: data]')
   if (!is.null(by) & !is.character(by)) stop('Wrong type for \'by\'. Look at \'by = ...\'')
 
   # Setup environment
   list2env(list(...), envir = environment())
   data <- if (is.character(data)) eval(parse(text = data)) else data
-  if (!tibble::is.tibble(data)) stop('Invalid data produced for row. Look at \'data = ...\'')
+  if (!tibble::is_tibble(data)) stop('Invalid data produced for row. Look at \'data = ...\'')
 
   # Check 'by' column
   if (!is.null(by)) {
@@ -211,7 +208,7 @@ build_row_ <- function(
 ) {
 
   args <- list(...)
-  tbl.names <- attributes(args)$names[sapply(X = args, FUN = tibble::is.tibble)]
+  tbl.names <- attributes(args)$names[sapply(X = args, FUN = tibble::is_tibble)]
   rm('...')
 
   # Verify \'by\' column in any provided tibbles
@@ -328,7 +325,7 @@ build_row_ <- function(
 build_footer <- function(.table = NULL, cols = NULL, by = NULL, data = NULL, parametric = FALSE) {
 
   # Hard stops
-  if (!tibble::is.tibble(data)) stop('No usable data. [check: data]')
+  if (!tibble::is_tibble(data)) stop('No usable data. [check: data]')
 
   # Autodetect columns
   if (is.null(cols)) cols <- names(data)

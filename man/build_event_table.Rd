@@ -4,8 +4,8 @@
 \alias{build_event_table}
 \title{build_event_table}
 \usage{
-build_event_table(fit, data, cols, skip, mv, digits, p.digits,
-  percent.sign)
+build_event_table(fit, data, cols, skip, mv, percent.sign, digits,
+  p.digits)
 }
 \arguments{
 \item{fit}{Required. Formula, survival::survfit(), survival::coxph(). The formula
@@ -22,12 +22,13 @@ Defaults to all usable columns in \'data\'.}
 \item{mv}{Optional. Logical. Indicates provided \'cols\' should be tested as part of one
 multi-variate model. Defaults to FALSE (univariate; seperate models).}
 
+\item{percent.sign}{Optional. Logical. Indicates percent sign should be printed
+for frequencies. Defaults to TRUE.}
+
 \item{digits}{Optional. Integer. Number of digits to round numerics to. Defaults to 1.}
 
 \item{p.digits}{Optional. Integer. Number of digits to print for p-values. Note that p-values are
 still rounded based on \'digits\' parameter. Defaults to 4.}
-
-\item{percent.sign}{Optional. Logical. Whether to print percent sign for frequencies. Defaults to FALSE.}
 }
 \value{
 Data is returned in the form of a tibble containing a row for each parameter.

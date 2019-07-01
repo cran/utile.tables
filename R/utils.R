@@ -1,6 +1,7 @@
 utils::globalVariables(c(
-  'Variable', 'Level', 'At Risk',
-  'Events', 'HR 95%CI', 'p'
+  'variable', 'level', 'subjects',
+  'events', 'estimate', 'conf.lower',
+  'conf.upper', 'p', ':='
 ))
 
 # Create a count summary row
@@ -10,34 +11,30 @@ utils::globalVariables(c(
   digits
 ) {
 
-  table.row <- tibble::tribble(
-    ~'Variable', ~'Key', ~'Value',
-    label, 'Overall', as.character(nrow(data))
-  )
+  # Counts w/ strata
+  if (!is.null(by))
+    dplyr::bind_cols(
+      Variable = label,
+      Overall = as.character(nrow(data)), # Overall
 
-  if (!is.null(by)) {
-    for (level.by in levels(data[[by]])) {
-      table.row <- tibble::add_row(
-        .data = table.row,
-        Variable = label,
-        Key = level.by,
-        Value = utile.tools::paste_freq(
-          count = nrow(dplyr::filter(data, !! rlang::sym(by) == level.by)),
-          total = ifelse(
-            remove.na,
-            nrow(dplyr::filter(.data = data, !is.na(!! rlang::sym(by)))),
-            nrow(data)
-          ),
-          percent.sign = percent.sign,
-          remove.na = remove.na,
-          digits = digits
+      purrr::map_dfc(
+        sort(levels(data[[by]])), # Levels to map
+        ~ tibble::tibble(
+          !!.x := utile.tools::paste_freq(
+            count = dplyr::filter(data, !! rlang::sym(by) == .x), # Rows in level
+            total = # Total rows
+              if (remove.na) dplyr::filter(.data = data, !is.na(!! rlang::sym(by)))
+              else data,
+            percent.sign = percent.sign,
+            digits = digits
+          )
         )
       )
-    }
-  }
+    )
 
-  # Fold row data into a table and return
-  tidyr::spread(data = table.row, key = 'Key', value = 'Value')
+  # Counts w/o stratification
+  else tibble::tibble(Variable = label, Overall = as.character(nrow(data)))
+
 }
 
 
@@ -49,11 +46,12 @@ utils::globalVariables(c(
   digits, p.digits
 ) {
 
-  if (label.stats) label <- if (!parametric) paste0(label, ', median[IQR]') else paste0(label, ', mean\u00B1SD')
+  # Append statistic to label, if appropriate
+  if (label.stats)
+    label <- if (!parametric) paste0(label, ', median[IQR]') else paste0(label, ', mean\u00B1SD')
 
-  table.row <- tibble::tribble(
-    ~'Variable', ~'Key', ~'Value',
-    label, 'Overall',
+  # Overall summary stat
+  overall_stat <-
     if (!parametric)
       utile.tools::paste_median(
         col = data[[col]],
@@ -66,77 +64,70 @@ utils::globalVariables(c(
         less.than.one = less.than.one,
         digits = digits
       )
-  )
 
-  # Strata summary statistics
-  if (!is.null(by)) {
-    for (level.by in levels(data[[by]])) {
-      data.by <- dplyr::filter(data, !! rlang::sym(by) == level.by)
-      table.row <- tibble::add_row(
-        .data = table.row,
-        Variable = label,
-        Key = level.by,
-        Value =
-          if (!parametric)
-            utile.tools::paste_median(
-              col = data.by[[col]],
-              less.than.one = less.than.one,
-              digits = digits
-            )
-          else
-            utile.tools::paste_mean(
-              data.by[[col]],
-              less.than.one = less.than.one,
-              digits = digits
-            )
-      )
-      table.row <- tibble::add_row(
-        .data = table.row,
-        Variable = label,
-        Key = paste0('Missing: ', level.by),
-        Value = utile.tools::paste_freq(
-          count = nrow(dplyr::filter(.data = data.by, is.na(!! rlang::sym(col)))),
-          total = nrow(data.by),
-          percent.sign = percent.sign,
-          remove.na = remove.na,
-          digits = digits
-        )
-      )
-    }
-    table.row <- tibble::add_row(
-      .data = table.row,
+  # Summarize strata
+  if (!is.null(by))
+    dplyr::bind_cols(
       Variable = label,
-      Key = 'Probability',
-      Value = utile.tools::test_numeric(
+      Overall = overall_stat,
+
+      purrr::map_dfc(
+        sort(levels(data[[by]])), # Strata
+        function (x) {
+          data_by <- dplyr::filter(data, !! rlang::sym(by) == x) # Stratum subset
+          tibble::tibble(
+
+            # Stratum statistic
+            !!x :=
+              if (!parametric)
+                utile.tools::paste_median(
+                  col = data_by[[col]],
+                  less.than.one = less.than.one,
+                  digits = digits
+                )
+              else
+                utile.tools::paste_mean(
+                  data_by[[col]],
+                  less.than.one = less.than.one,
+                  digits = digits
+                ),
+
+            # Stratum missing count
+            !!paste0('Missing: ', x) := utile.tools::paste_freq(
+                count = dplyr::filter(.data = data_by, is.na(!! rlang::sym(col))),
+                total = data_by,
+                percent.sign = percent.sign,
+                digits = digits
+              )
+          )
+        }
+      ),
+
+      # Strata test
+      Probability = utile.tools::test_numeric(
         col = col, by = by, parametric = parametric,
         data = data, digits = digits, p.digits = p.digits
+      ),
+
+      # Strata test labels
+      if (label.stats) tibble::tibble(
+        Test = if (!parametric) 'Wilcox {NP}' else 'Student\'s {P}'
       )
     )
-    if (label.stats) {
-      table.row <- tibble::add_row(
-        .data = table.row,
-        Variable = label,
-        Key = 'Test',
-        Value = if (!parametric) 'Wilcox {NP}' else 'Student\'s {P}'
-      )
-    }
-  } else {
-    table.row <- tibble::add_row(
-      .data = table.row,
+
+  # Overall summary w/o strata
+  else
+    dplyr::bind_cols(
       Variable = label,
-      Key = 'Missing',
-      Value = utile.tools::paste_freq(
-        count = nrow(dplyr::filter(data, is.na(!! rlang::sym(col)))),
-        total = nrow(data),
+      Overall = overall_stat,
+      Missing = utile.tools::paste_freq(
+        count = dplyr::filter(data, is.na(!! rlang::sym(col))),
+        total = data,
         percent.sign = percent.sign,
-        remove.na = remove.na,
         digits = digits
       )
     )
-  }
 
-  # Fold row data into a table and return
-  tidyr::spread(data = table.row, key = 'Key', value = 'Value')
 }
 
 
@@ -149,113 +140,106 @@ utils::globalVariables(c(
   digits, p.digits
 ) {
 
+  # Append statistic to label, if appropriate
   if (label.stats) label <- paste0(label, ', n(%)')
 
-  # Create variable header row
-  table.row <- tibble::tibble(Variable = character(), Key = character(), Value = character())
+  dplyr::bind_rows(
 
-  if (!is.null(by)) {
-    for (level.by in levels(data[[by]])) {
-      table.row <- tibble::add_row(.data = table.row, Variable = label, Key = level.by, Value = NA)
-      data.by <- dplyr::filter(data, !! rlang::sym(by) == level.by)
-      table.row <- tibble::add_row(
-        .data = table.row,
-        Variable = label,
-        Key = paste0('Missing: ', level.by),
-        Value = utile.tools::paste_freq(
-          count = nrow(dplyr::filter(.data = data.by, is.na(!! rlang::sym(col)))),
-          total = nrow(data.by),
-          percent.sign = percent.sign,
-          remove.na = remove.na,
-          digits = digits
+    # Factor variable row
+    dplyr::bind_cols(
+      Variable = label,
+
+      # Count & test strata
+      if (!is.null(by))
+        dplyr::bind_cols(
+
+          # Strata missing
+          purrr::map_dfc(
+            sort(levels(data[[by]])), # Strata
+            function (x) {
+              data_by <- dplyr::filter(data, !! rlang::sym(by) == x) # Stratum subset
+              tibble::tibble(
+                !!paste0('Missing: ', x) := utile.tools::paste_freq(
+                  count = dplyr::filter(.data = data_by, is.na(!! rlang::sym(col))),
+                  total = data_by,
+                  percent.sign = percent.sign,
+                  digits = digits
+                )
+              )
+            }
+          ),
+
+          # Strata tests
+          tibble::tibble(
+            Probability = utile.tools::test_factor(
+              col = col, by = by, parametric = parametric,
+              data = data, digits = digits, p.digits = p.digits
+            )
+          ),
+
+          # Test labels
+          if (label.stats) {
+            tibble::tibble(Test = if (!parametric) 'Chisq {NP}' else 'Fisher\'s {P}')
+          }
         )
-      )
-    }
-    table.row <- tibble::add_row(
-      .data = table.row,
-      Variable = label,
-      Key = 'Probability',
-      Value = utile.tools::test_factor(
-        col = col, by = by, parametric = parametric,
-        data = data, digits = digits, p.digits = p.digits
-      )
-    )
-    if (label.stats) {
-      table.row <- tibble::add_row(
-        .data = table.row,
-        Variable = label,
-        Key = 'Test',
-        Value = if (!parametric) 'Chisq {NP}' else 'Fisher\'s {P}'
-      )
-    }
-  } else {
-    table.row <- tibble::add_row(
-      .data = table.row,
-      Variable = label,
-      Key = 'Missing',
-      Value = utile.tools::paste_freq(
-        count = nrow(dplyr::filter(data, is.na(!! rlang::sym(col)))),
-        total = nrow(data),
-        percent.sign = percent.sign,
-        remove.na = remove.na,
-        digits = digits
-      )
-    )
-  }
 
-  table <- tidyr::spread(data = table.row, key = 'Key', value = 'Value')
-
-  # Summarize: Each level
-  for (level in sort(levels(data[[col]]))) {
-    level.name <- paste('  ', level, sep = '')
-
-    # Level data subset
-    subset <- dplyr::filter(data, !! rlang::sym(col) == level)
-
-    # Create row data stub
-    table.row <- tibble::tribble(
-      ~'Variable', ~'Key', ~'Value',
-      level.name, 'Overall', utile.tools::paste_freq(
-        count = nrow(subset),
-        total = ifelse(
-          remove.na,
-          nrow(dplyr::filter(.data = data, !is.na(!! rlang::sym(col)))),
-          nrow(data)
-        ),
-        percent.sign = percent.sign,
-        remove.na = remove.na,
-        digits = digits
-      )
-    )
-
-    # Summarize strata data if necessary
-    if (!is.null(by)) {
-      for (level.by in sort(levels(data[[by]]))) {
-        table.row <- tibble::add_row(
-          .data = table.row,
-          Variable = level.name,
-          Key = level.by,
-          Value = utile.tools::paste_freq(
-            count = nrow(dplyr::filter(subset, !! rlang::sym(by) == level.by)),
-            total = ifelse(
-              remove.na,
-              nrow(dplyr::filter(data, !! rlang::sym(by) == level.by & !is.na(!! rlang::sym(col)))),
-              nrow(dplyr::filter(data, !! rlang::sym(by) == level.by))
-            ),
+      # Overall missing
+      else
+        tibble::tibble(
+          Missing = utile.tools::paste_freq(
+            count = dplyr::filter(data, is.na(!! rlang::sym(col))),
+            total = data,
             percent.sign = percent.sign,
-            remove.na = remove.na,
             digits = digits
           )
         )
+
+    ),
+
+    # Factor level rows
+    purrr::map_dfr(
+      sort(levels(data[[col]])), # Level names
+      function (x) {
+        data_level <- dplyr::filter(data, !! rlang::sym(col) == x)
+        dplyr::bind_cols(
+
+          # Overall counts
+          Variable = paste0('  ', x),
+          Overall = utile.tools::paste_freq(
+            count = data_level,
+            total =
+              if (remove.na)
+                dplyr::filter(.data = data, !is.na(!! rlang::sym(col)))
+              else data,
+            percent.sign = percent.sign,
+            digits = digits
+          ),
+
+          # Strata counts
+          if (!is.null(by)) {
+            purrr::map_dfc(
+              sort(levels(data[[by]])),
+              function (y) {
+                tibble::tibble(
+                  !!y := utile.tools::paste_freq(
+                    count = dplyr::filter(data_level, !! rlang::sym(by) == y),
+                    total =
+                      if (remove.na)
+                        dplyr::filter(data, !! rlang::sym(by) == y & !is.na(!! rlang::sym(col)))
+                    else dplyr::filter(data, !! rlang::sym(by) == y),
+                    percent.sign = percent.sign,
+                    digits = digits
+                  )
+                )
+              }
+            )
+          }
+
+        )
       }
-    }
+    )
 
-    # Fold row level data into main table
-    table <- dplyr::bind_rows(table, tidyr::spread(data = table.row, key = 'Key', value = 'Value'))
-  }
-
-  # Return table
-  table
+  )
 }
 
 
@@ -269,128 +253,127 @@ utils::globalVariables(c(
   p.digits
 ) {
 
-  if (label.stats) label <- if (!inverse) paste0(label, ', yes, n(%)') else paste0(label, ', no, n(%)')
+  # Append statistic to label, if appropriate
+  label <- if (!inverse) paste0(label, ', yes') else paste0(label, ', no')
+  if (label.stats) label <- paste0(label, ', n(%)')
 
   # True/yes Subset
-  subset <-
+  data_subset <-
     if (!inverse) dplyr::filter(data, !! rlang::sym(col))
-  else dplyr::filter(data, !(!! rlang::sym(col)))
+    else dplyr::filter(data, !(!! rlang::sym(col)))
 
-  # Create row data stub
-  table.row <- tibble::tribble(
-    ~'Variable', ~'Key', ~'Value',
-    label, 'Overall',
-    utile.tools::paste_freq(
-      count = nrow(subset),
-      total = ifelse(
-        remove.na,
-        nrow(dplyr::filter(.data = data, !is.na(!! rlang::sym(col)))),
-        nrow(data)
-      ),
-      percent.sign = percent.sign,
-      remove.na =remove.na,
-      digits = digits
-    )
+  # Overall statistic
+  overall_stat <- utile.tools::paste_freq(
+    count = data_subset,
+    total =
+      if (remove.na) dplyr::filter(.data = data, !is.na(!! rlang::sym(col)))
+    else data,
+    percent.sign = percent.sign,
+    digits = digits
   )
 
-  # Summarize strata data if necessary
-  if (!is.null(by)) {
-    for (level.by in levels(data[[by]])) {
-      data.by <- dplyr::filter(data, !! rlang::sym(by) == level.by)
-      table.row <- tibble::add_row(
-        .data = table.row,
-        Variable = label,
-        Key = level.by,
-        Value = utile.tools::paste_freq(
-          count = nrow(dplyr::filter(subset, !! rlang::sym(by) == level.by)),
-          total = ifelse(
-            remove.na,
-            nrow(dplyr::filter(.data = data.by, !is.na(!! rlang::sym(col)))),
-            nrow(data.by)
-          ),
-          percent.sign = percent.sign,
-          remove.na = remove.na,
-          digits = digits
-        )
-      )
-      table.row <- tibble::add_row(
-        .data = table.row,
-        Variable = label,
-        Key = paste0('Missing: ', level.by),
-        Value = utile.tools::paste_freq(
-          count = nrow(dplyr::filter(.data = data.by, is.na(!! rlang::sym(col)))),
-          total = nrow(data.by),
-          percent.sign = percent.sign,
-          remove.na = remove.na,
-          digits = digits
-        )
-      )
-    }
-    table.row <- tibble::add_row(
-      .data = table.row,
+  # Summarize strata
+  if (!is.null(by))
+    dplyr::bind_cols(
       Variable = label,
-      Key = 'Probability',
-      Value = utile.tools::test_factor(
+      Overall = overall_stat,
+
+      purrr::map_dfc(
+        sort(levels(data[[by]])), # Strata
+        function (x) {
+          data_by <- dplyr::filter(data, !! rlang::sym(by) == x) # Stratum subset
+          tibble::tibble(
+
+            # Stratum statistic
+            !!x := utile.tools::paste_freq(
+              count = dplyr::filter(data_subset, !! rlang::sym(by) == x),
+              total =
+                if (remove.na)
+                  dplyr::filter(.data = data_by, !is.na(!! rlang::sym(col)))
+                else data_by,
+              percent.sign = percent.sign,
+              digits = digits
+            ),
+
+            # Stratum missing count
+            !!paste0('Missing: ', x) := utile.tools::paste_freq(
+              count = dplyr::filter(.data = data_by, is.na(!! rlang::sym(col))),
+              total = data_by,
+              percent.sign = percent.sign,
+              digits = digits
+            )
+
+          )
+        }
+      ),
+
+      # Strata test
+      Probability = utile.tools::test_factor(
         col = col, by = by, parametric = parametric,
         data = data, digits = digits, p.digits = p.digits
+      ),
+
+      # Strata test labels
+      if (label.stats) tibble::tibble(
+        Test = if (!parametric) 'Chisq {NP}' else 'Fisher\'s {P}'
       )
+
     )
-    if (label.stats) {
-      table.row <- tibble::add_row(
-        .data = table.row,
-        Variable = label,
-        Key = 'Test',
-        Value = if (!parametric) 'Chisq {NP}' else 'Fisher\'s {P}'
-      )
-    }
-  } else {
-    table.row <- tibble::add_row(
-      .data = table.row,
+
+  # Overall summary w/o strata
+  else
+    dplyr::bind_cols(
       Variable = label,
-      Key = 'Missing',
-      Value = utile.tools::paste_freq(
-        count = nrow(dplyr::filter(data, is.na(!! rlang::sym(col)))),
-        total = nrow(data),
+      Overall = overall_stat,
+      Missing = utile.tools::paste_freq(
+        count = dplyr::filter(data, is.na(!! rlang::sym(col))),
+        total = data,
         percent.sign = percent.sign,
-        remove.na = remove.na,
         digits = digits
       )
     )
-  }
-
-  # Fold row data into main table and return
-  tidyr::spread(data = table.row, key = 'Key', value = 'Value')
 }
 
 # Create coxph summary row
-.row_coxph <- function (label, col, fit, digits, p.digits, percent.sign) {
+.row_coxph <- function (label, col, fit, percent.sign, digits, p.digits) {
 
   # Hard stop
   if (is.null(fit) | class(fit) != 'coxph') stop('Missing valid coxph object. [check: fit]')
 
-  # Tabulate and return
-  dplyr::transmute(
-    .data = dplyr::filter(
-      utile.tools::tabulate_model(
-        fit = fit, digits = digits, p.digits = p.digits,
-        percent.sign = percent.sign
+  model_table <- utile.tools::tabulate_model(fit = fit, format = FALSE)
+
+  dplyr::mutate_all(
+    dplyr::transmute(
+      .data = dplyr::filter(model_table, variable == col),
+      Variable = purrr::map2_chr(
+        variable, level,
+        function(x, y)
+          if (!is.na(y)) {
+            if (nrow(model_table[model_table$variable == x,]) == 1)
+              paste(if (!is.null(label)) label else x, y, sep = ', ')
+            else paste0('   ', y)
+          } else if (!is.null(label)) label
+          else x
       ),
-      Variable == col
+      Subjects = subjects,
+      Events = utile.tools::paste_freq(
+        count = events, total = subjects, percent.sign = percent.sign, digits = digits
+      ),
+      HR = round(estimate, digits = digits),
+      `[95%CI]` = ifelse(
+        !is.na(conf.lower) & !is.na(conf.upper),
+        paste0('[', round(conf.lower, digits = digits), '-', round(conf.upper, digits = digits), ']'),
+        NA
+      ),
+      p = ifelse(
+        !is.na(p),
+        format.pval(pv = p, digits = digits, eps = 0.0001, nsmall = p.digits, scientific = F),
+        NA
+      )
     ),
-    Variable = purrr::map2_chr(
-      Variable, Level,
-      function(x, y)
-        if (!is.na(y)) {
-          if (dplyr::n() == 1) paste(if (!is.null(label)) label else x, y, sep = ', ')
-          else paste0('   ', y)
-        } else if (!is.null(label)) label
-        else x
-    ),
-    `At Risk` = `At Risk`,
-    Events = Events,
-    `HR 95%CI` = `HR 95%CI`,
-    p = p
+    as.character
   )
+
 }
 
 
@@ -429,4 +412,4 @@ utils::globalVariables(c(
 
 
 # Make NA's human readable
-.replace_na <- function(table) replace(table, is.na(table), '')
+.replace_na <- function(x) replace(x, is.na(x), '')
