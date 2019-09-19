@@ -147,6 +147,8 @@ build_event_row_ <- function(fit, data, percent.sign, digits, p.digits, indent) 
     fit = .fit, data = .data, percent.sign = .percent.sign,
     digits = .digits, p.digits = .p.digits, indent = .indent
   ) {
+    table <- .table
+
     if (!is.null(col)) {
       if (!is.numeric(data[[col]]) & !is.factor(data[[col]]) & !is.logical(data[[col]]))
         message(paste0('Skipping:    ', col, ' (unusable type)'))
@@ -155,7 +157,7 @@ build_event_row_ <- function(fit, data, percent.sign, digits, p.digits, indent) 
       else if (is.factor(data[[col]]) & length(levels(data[[col]])) < 2)
         message(paste0('Skipping:    ', col, ' (factor <2 lvls)'))
       else
-        do.call(
+        table <- do.call(
           build_event_row,
           c(
             list(
@@ -175,7 +177,10 @@ build_event_row_ <- function(fit, data, percent.sign, digits, p.digits, indent) 
             )
           )
         )
-    } else do.call(build_event_row, list(.table = .table, label = label, indent = indent))
+    } else table <- do.call(build_event_row, list(.table = .table, label = label, indent = indent))
+
+    # Return table
+    table
   }
 }
 

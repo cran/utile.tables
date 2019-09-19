@@ -1,12 +1,12 @@
-c6fd7465f17f99c6638fc1ef3bb4eedc *DESCRIPTION
+b4f466a9e74ce89f77b935ca2d9ed3e8 *DESCRIPTION
 2e4b42f4586f7ac8a48845abcf4f2b4d *NAMESPACE
-2e3f51b50168a1cb9218adaf8b72d02e *NEWS.md
-796631e56c280c9609c1fa119af0814d *R/build_event_row.R
+b712e20872f78d459c01f214955f631e *NEWS.md
+54adfb2359db5ce2f778d1b1b2cecb38 *R/build_event_row.R
 e04f3b43e75b63891b6c6a708f081dfe *R/build_event_table.R
 26c6ad60b23970ff4d85cd3fe96d47fe *R/build_row.R
 2c258b5873ba85c4cb4cb0eaee2d6928 *R/build_table.R
 1f2e4e584142c105be42cbaa1fc7326e *R/utils.R
-5fbee0c2603874db0cda03949d49a5a0 *README.md
+93fa5780ba3fc01b6924fde751509d2a *README.md
 9bff7cba080865ce8b91dd2ec4677017 *man/build_event_row.Rd
 84c43cdb487a890a00b4e54eb34742bf *man/build_event_row_.Rd
 1016934f83ed58cddb02e75298eaea7e *man/build_event_table.Rd
