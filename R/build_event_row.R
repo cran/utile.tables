@@ -63,8 +63,15 @@ build_event_row <- function(
   else table <- NULL
 
   # Merge with given data
-  if (!is.null(.table)) table <- dplyr::bind_rows(.table, table)
-  table <- .replace_na(table)
+  if (is.null(table)) {
+    # Gracefully handle unuseful data types
+    if (!is.null(.table)) table <- .table
+    else table <- tibble::tibble()
+  } else {
+    # Merge row data
+    table <- dplyr::bind_rows(.table, table)
+    table <- .replace_na(table)
+  }
 
   # Return table
   table

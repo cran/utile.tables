@@ -1,11 +1,11 @@
-b4f466a9e74ce89f77b935ca2d9ed3e8 *DESCRIPTION
+86ed73511aaf74dbb84de59255a4e9ba *DESCRIPTION
 2e4b42f4586f7ac8a48845abcf4f2b4d *NAMESPACE
-b712e20872f78d459c01f214955f631e *NEWS.md
-54adfb2359db5ce2f778d1b1b2cecb38 *R/build_event_row.R
+f75e261306b554992f7c98082a5d2f4d *NEWS.md
+9ed59276b246011fe85d24cd5f58b175 *R/build_event_row.R
 e04f3b43e75b63891b6c6a708f081dfe *R/build_event_table.R
 26c6ad60b23970ff4d85cd3fe96d47fe *R/build_row.R
 2c258b5873ba85c4cb4cb0eaee2d6928 *R/build_table.R
-1f2e4e584142c105be42cbaa1fc7326e *R/utils.R
+fcb73cc1f4a9a17011ad023bc52d6760 *R/utils.R
 93fa5780ba3fc01b6924fde751509d2a *README.md
 9bff7cba080865ce8b91dd2ec4677017 *man/build_event_row.Rd
 84c43cdb487a890a00b4e54eb34742bf *man/build_event_row_.Rd
@@ -14,5 +14,3 @@ e04f3b43e75b63891b6c6a708f081dfe *R/build_event_table.R
 8a2d308da21f8402c7ad5ccee8cbda88 *man/build_row.Rd
 951d7d08334429160f4479f342ce3fc9 *man/build_row_.Rd
 c3714490c080f69b7ff3ed31aff739b3 *man/build_table.Rd
-4728bf167c49609db64bc6962ac50041 *tests/testthat.R
-821f5972028de05178aef3f5ce6182c3 *tests/testthat/test-build_row.R
