@@ -2,101 +2,26 @@
 % Please edit documentation in R/build_row.R
 \name{build_row}
 \alias{build_row}
-\title{build_row}
+\title{Build summary rows}
 \usage{
-build_row(
-  .table = NULL,
-  label = NULL,
-  col = NULL,
-  by = NULL,
-  data = NULL,
-  parametric = FALSE,
-  inverse = FALSE,
-  indent = FALSE,
-  percent.sign = TRUE,
-  less.than.one = FALSE,
-  remove.na = TRUE,
-  label.stats = TRUE,
-  digits = 1,
-  p.digits = 4,
-  ...
-)
+build_row(x, ...)
 }
 \arguments{
-\item{.table}{Optional. Tibble. A tibble to append row data to.}
+\item{x}{An object of a supported class. See S3 methods below.}
 
-\item{label}{Optional. Character. Label for the row (i.e. 'Age, years'). Defaults to value of \'col\'.}
-
-\item{col}{Optional. Character. Name of column to be summarized. If left blank, either a
-frequency row will be created (if 'label' not specified) or empty label row created
-(if 'label' specified).}
-
-\item{by}{Optional. Character. Name of factor or logical column to stratify by. If using
-build_row_(), this may be pre-specified.}
-
-\item{data}{Required/Optional. Tibble or Character. Contains data to summarize.
-If using build_row_() to pre-load data, you may instead provide a character
-string of code that would represent how you would reference the tibble
-(i.e.  '.index' or '.index %>% filter(my_subgroup)'). If, while using build_row_(),
-you also specified a default tibble to be used via data.default, that tibble will
-automatically be used as a fallback if the 'data' parameter is left blank.}
-
-\item{parametric}{Optional. Logical. Indicates parametric testing should be used for comparisons
-(Fisher's exact and Student's Unpaired T-Test). Defaults to FALSE (non-parametric; Chi-squared and
-Wilcox Rank-sum).}
-
-\item{inverse}{Optional. Logical. Indicates to summarize the FALSE/No data of a logical column
-(i.e. 'Smoking Hx, yes' -> 'Smoking Hx, no'). Defaults to FALSE (Summarizes TRUE/Yes data).}
-
-\item{indent}{Optional. Logical. Indent a variable's label. Defaults to FALSE.}
-
-\item{percent.sign}{Optional. Logical. Indicates percent sign should be printed for
-frequencies. Defaults to TRUE.}
-
-\item{less.than.one}{Optional. Logical. Indicates means/medians that round to 0 should be
-printed as <1 (i.e. <1 [0-4]). Defaults to FALSE (0).}
-
-\item{remove.na}{Optional. Logical. Remove NA from denominator in frequency calculations.
-Defaults to TRUE.}
-
-\item{label.stats}{Optional. Logical. Whether to append the type of statistic (median, n, mean)
-to the row's label. Defaults to TRUE.}
-
-\item{digits}{Optional. Integer. Number of digits to round numerics to. Defaults to 1.}
-
-\item{p.digits}{Optional. Integer. Number of p-value digits to print. Note
-that p-values are still rounded based on \'digits\' parameter. Defaults to 4.}
-
-\item{...}{Optional. Any other variables or tibbles you want to make available for use
-as row data. Recommend naming each of these with a starting '.' to ensure they
-do not conflict with other variables (i.e. build_row(.index = data.index,
-.radiology = data.radiology)).}
+\item{...}{Arguments passed to the appropriate S3 method.}
 }
 \value{
-Data is returned in the form of a tibble containing the row(s).
+A \code{\link[tibble:tibble]{tibble::tibble()}} summarizing the
+provided data.
 }
 \description{
-Generates a summarizing table row from column data.
+Summarize a data into a data.frame row(s). Optional
+stratification and null hypothesis testing using a factor or logical.
 }
-\examples{
-library(dplyr)
-
-data_mtcars <- datasets::mtcars \%>\%
-  as_tibble() \%>\%
-  mutate_at(vars('vs', 'am'), as.logical) \%>\%
-  mutate_at(vars('gear', 'carb', 'cyl'), as.factor)
-
-# Stand-alone row
-build_row(
-  label = 'Gears',
-  col = 'gear',
-  by = 'am',
-  data = data_mtcars,
-  percent.sign = FALSE
-)
-
-# Summary Table
-build_row(label = 'Miles per gallon', col = 'mpg', data = data_mtcars) \%>\%
-build_row(label = 'Cylinders', col = 'cyl', data = data_mtcars) \%>\%
-build_row(label = 'Horsepower', col = 'hp', data = data_mtcars)
+\seealso{
+\code{\link{build_row.data.frame}},
+\code{\link{build_row.numeric}},
+\code{\link{build_row.logical}},
+\code{\link{build_row.factor}}
 }
