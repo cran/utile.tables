@@ -12,8 +12,8 @@ build_row(x, ...)
 \item{...}{Arguments passed to the appropriate S3 method.}
 }
 \value{
-A \code{\link[tibble:tibble]{tibble::tibble()}} summarizing the
-provided data.
+An object of class \code{tbl_df} (tibble) summarizing the provided
+data.
 }
 \description{
 Summarize a data into a data.frame row(s). Optional

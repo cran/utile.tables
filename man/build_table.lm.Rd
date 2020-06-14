@@ -41,8 +41,8 @@ that the p-value still rounded to the number of digits specified in
 \code{.digits}.}
 }
 \value{
-A \code{\link[tibble:tibble]{tibble::tibble()}} summarizing the
-provided object.
+An object of class \code{tbl_df} (tibble) summarizing the provided
+object.
 }
 \description{
 Takes a linear regression model object and summarizes it into a

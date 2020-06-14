@@ -3,8 +3,7 @@
 #' export, human-readable summary table.
 #' @param .object An object of a supported class. See S3 methods below.
 #' @param ... Arguments passed to the appropriate S3 method.
-#' @return A \code{\link[tibble:tibble]{tibble::tibble()}} summarizing the
-#' provided object.
+#' @return An object of class tbl_df (tibble) summarizing the provided object.
 #' @seealso \code{\link{build_table.data.frame}},
 #' \code{\link{build_table.coxph}},
 #' \code{\link{build_table.lm}}
@@ -44,21 +43,24 @@ build_table.default <- function (.object, ...) {
 #' reported frequencies.
 #' @param .digits An integer. Optional. The number of digits to round numbers to.
 #' @param .p.digits An integer. Optional. The number of p-value digits to report.
-#' @return A \code{\link[tibble:tibble]{tibble::tibble()}} summarizing the
-#' provided object.
+#' @return An object of class \code{tbl_df} (tibble) summarizing the provided
+#' object.
 #' @seealso \code{\link{build_table}}
 #' @examples
-#' library(dplyr)
+#' # Sample data
+#' df <- data.frame(
+#'   strata = factor(sample(letters[1:3], 1000, replace = TRUE)),
+#'   numeric = sample(1:100, 1000, replace = TRUE),
+#'   numeric2 = sample(1:100, 1000, replace = TRUE),
+#'   factor = factor(sample(1:5, 1000, replace = TRUE)),
+#'   logical = sample(c(TRUE,FALSE), 1000, replace = TRUE)
+#' )
 #'
-#' data_mtcars <- datasets::mtcars %>%
-#'   mutate_at(vars('vs', 'am'), as.logical) %>%
-#'   mutate_at(vars('gear', 'carb', 'cyl'), as.factor)
+#' # Summarize all columns
+#' build_table(df, .by = strata)
 #'
-#' # Summarize all columns by cylindars variable
-#' data_mtcars %>% build_table(.by = cyl, .show.test = TRUE)
-#'
-#' # Summarize specific columns of data
-#' data_mtcars %>% build_table(mpg, vs, carb)
+#' # Summarize & rename selected columns
+#' build_table(df, Numeric = numeric2, Factor = factor, .by = strata)
 #' @export
 build_table.data.frame <- function(
   .object,
@@ -76,15 +78,15 @@ build_table.data.frame <- function(
 ) {
 
   # Column selection
-  cols <- if (length(rlang::enexprs(...)) > 0) {
+  cols <- if (rlang::dots_n(...) > 0) {
     tidyselect::eval_select(rlang::expr(c(...)), data = .object)
   } else {
     rlang::set_names(1:length(names(.object)), names(.object))
   }
 
   # By variable selection and validation
-  by <- if (!missing(.by) & length((.by <- rlang::enexpr(.by)) == 1)) {
-    tidyselect::eval_select(.by, data = .object)
+  by <- if (!missing(.by) & rlang::dots_n(.by) == 1) {
+    tidyselect::eval_select(rlang::enexpr(.by), data = .object)
   }
 
   if (length(by) > 0) {
@@ -126,7 +128,7 @@ build_table.data.frame <- function(
     purrr::imap_dfr(cols, ~ build_row_(x = .object[[.x]], label = .y))
   )
 
-  # Replace return table
+  # Replace NA's & return table
   .replace_na(table)
 
 }
@@ -151,8 +153,8 @@ build_table.data.frame <- function(
 #' @param .p.digits An integer. The number of p-value digits to report. Note
 #' that the p-value still rounded to the number of digits specified in
 #' \code{.digits}.
-#' @return A \code{\link[tibble:tibble]{tibble::tibble()}} summarizing the
-#' provided object.
+#' @return An object of class \code{tbl_df} (tibble) summarizing the provided
+#' object.
 #' @seealso \code{\link{build_table}}
 #' @examples
 #' library(survival)
@@ -178,7 +180,7 @@ build_table.coxph <- function(
 ) {
 
   # Column selection
-  terms <- if (length(rlang::enexprs(...)) > 0) {
+  terms <- if (rlang::dots_n(...) > 0) {
     tidyselect::eval_select(expr = rlang::expr(c(...)), data = .object$assign)
   } else {
     rlang::set_names(
@@ -198,18 +200,18 @@ build_table.coxph <- function(
   names(assignments) <- names(terms)
 
   # Check test argument
-  prefer.tests <- methods::hasArg(.test)
+  prefer.tests <- '.test' %in% names(match.call())
   .test <- match.arg(.test)
 
   # Tabulate & format estimates
-  estimates <- cbind(
-    summary(.object)$coefficients,
-    stats::confint(.object, level = .level)
+  estimates <- as.data.frame(
+    cbind(
+      summary(.object)$coefficients,
+      stats::confint(.object, level = .level)
+    )
   )
   estimates[,6:7] <- exp(estimates[,6:7])
-  estimates[,c(2,4,6,7)] <- as.character(
-    round(estimates[,c(2,4,6,7)], digits = .digits)
-  )
+  estimates[,-5] <- round(estimates[,-5], digits = .digits)
   estimates[,5] <- format.pval(
     pv = estimates[,5],
     digits = .digits,
@@ -218,15 +220,19 @@ build_table.coxph <- function(
     scientific = F,
     na.form = ''
   )
+  estimates[] <- lapply(estimates, as.character)
+
 
   # Tabulate & format special tests
-  tests <- stats::drop1(
-    if (any(is.na(eval(.object$call$data)[all.vars(stats::formula(.object))]))) {
-      .refit_model(x = .object, na.rm = TRUE)
-    } else .object,
-    test = 'Chisq'
+  tests <- as.data.frame(
+    stats::drop1(
+      if (any(is.na(eval(.object$call$data)[all.vars(stats::formula(.object))]))) {
+        .refit_model(x = .object, na.rm = TRUE)
+      } else .object,
+      test = 'Chisq'
+    )
   )[terms + 1, 3:4]
-  tests[,1] <- as.character(round(tests[,1], digits = .digits))
+  tests[,-2] <- round(tests[,-2], digits = .digits)
   tests[,2] <- format.pval(
     pv = tests[,2],
     digits = .digits,
@@ -235,117 +241,111 @@ build_table.coxph <- function(
     scientific = F,
     na.form = ''
   )
+  tests[] <- lapply(tests, as.character)
+
 
   # Generate table
   table <- purrr::imap_dfr(
     assignments,
-
-    # Map assignments
     function (w, x) {
 
       single_level <- (has_levels <- !is.null(names(w))) & length(w) == 2
       if (single_level) w <- w[-1] # Ignore reference level of a 2-level
 
-      row <- c(
-        list(
 
-          # Variable name
-          Variable = if (single_level) paste0(x, ', ', names(w)) else x,
+      # Create column object
+      cols <- list()
 
-          # Number of observations
-          n = as.character(.object$n),
+      # Variable name
+      cols$Variable <- if (single_level) paste0(x, ', ', names(w)) else x
 
-          # Number of events
-          Event = as.character(.object$nevent),
+      # Number of observations
+      cols$n <- as.character(.object$n)
 
-          # Effect estimate & CI
-          'HR [CI]' = if (!has_levels | single_level) {
-            paste(
-              estimates[w, 2],
-              if (all(!is.na(estimates[w, 6:7]))) {
-                paste0('[', estimates[w, 6], '-', estimates[w, 7], ']')
-              } else '[NA]'
-            )
-          } else ''
+      # Number of events
+      cols$Event <- as.character(.object$nevent)
 
-        ),
-
-        # Report test
-        if (.show.test) {
-          list(
-            Test =
-              if ((prefer.tests & .test == 'LRT') | (has_levels & !single_level)) {
-                'LRT'
-              } else 'Wald',
-            Statistic =
-              if ((prefer.tests & .test == 'LRT') | (has_levels & !single_level)) {
-                tests[match(x, names(assignments)), 1]
-              } else estimates[w, 4]
-          )
-        },
-
-        # p-value
-        list(
-          p = if ((prefer.tests & .test == 'LRT') | (has_levels & !single_level)) {
-            tests[match(x, names(assignments)), 2]
-          } else estimates[w, 5]
+      # Effect estimate & CI
+      cols$`HR [CI]` = if (!has_levels | single_level) {
+        paste(
+          estimates[w, 2],
+          if (all(!is.na(estimates[w, 6:7]))) {
+            paste0('[', estimates[w, 6], '-', estimates[w, 7], ']')
+          } else '[NA]'
         )
+      } else ''
 
-      )
+      # p-value
+      cols$p <- if ((prefer.tests & .test == 'LRT') | (has_levels & !single_level)) {
+        tests[match(x, names(assignments)), 2]
+      } else estimates[w, 5]
+
+      # Report test
+      if (.show.test) {
+
+        cols$Test <-
+          if ((prefer.tests & .test == 'LRT') | (has_levels & !single_level)) {
+            'LRT'
+          } else 'Wald'
+
+        cols$Statistic <-
+          if ((prefer.tests & .test == 'LRT') | (has_levels & !single_level)) {
+            tests[match(x, names(assignments)), 1]
+          } else estimates[w, 4]
+
+      }
+
 
       # Generate factor level rows
       if (has_levels & !single_level) {
 
-        dplyr::bind_rows(
-          row,
+        # Level names (incl. ref)
+        cols$Variable <- c(cols$Variable, paste('  ', names(w)))
 
-          # Reference level
-          list(
-            Variable = paste('  ', names(w[1])),
-            'HR [CI]' = 'Reference'
-          ),
+        # Number of observations
+        cols$n <- c(cols$n, rep('', length(w)))
 
-          # Map level assignments
-          list(
+        # Number of events
+        cols$Event <- c(cols$Event, rep('', length(w)))
 
-            # Factor level name
-            Variable = paste('  ', names(w[-1])),
-
-            # Effect estimate and CI
-            'HR [CI]' = paste(
-                estimates[w[-1], 2],
-                ifelse(
-                  !is.na(estimates[w[-1], 6]) & !is.na(estimates[w[-1], 7]),
-                  paste0('[', estimates[w[-1], 6], '-', estimates[w[-1], 7], ']'),
-                  '[NA]'
-                )
-              ),
-
-            # Level p-value
-            p = estimates[w[-1], 5]
-
-          ),
-
-          # Report test
-          if (.show.test) {
-            list(
-              Test = c('', rep('Wald', length(w[-1]))),
-              Statistic = c('', estimates[w[-1], 4])
+        # Effect estimate and CI
+        cols$`HR [CI]` <- c(
+          cols$`HR [CI]`,
+          'Reference',
+          paste(
+            estimates[w[-1], 2],
+            ifelse(
+              !is.na(estimates[w[-1], 6]) & !is.na(estimates[w[-1], 7]),
+              paste0('[', estimates[w[-1], 6], '-', estimates[w[-1], 7], ']'),
+              '[NA]'
             )
-          }
-
+          )
         )
 
-      } else row
+        # Level p-value
+        cols$p <- c(cols$p, '', estimates[w[-1], 5])
+
+        # Report test
+        if (.show.test) {
+
+          cols$Test <- c(cols$Test, '', rep('Wald', length(w[-1])))
+
+          cols$Statistic <- c(cols$Statistic, '', estimates[w[-1], 4])
+
+        }
+
+      }
+
+      # Return as df (better performance)
+      dplyr::as_tibble(cols)
 
     }
   )
 
-  # Replace return table
+  # Replace NA's
   .replace_na(table)
 
 }
-
 
 
 #' @title Build summary tables from lm model objects
@@ -367,8 +367,8 @@ build_table.coxph <- function(
 #' @param .p.digits An integer. The number of p-value digits to report. Note
 #' that the p-value still rounded to the number of digits specified in
 #' \code{.digits}.
-#' @return A \code{\link[tibble:tibble]{tibble::tibble()}} summarizing the
-#' provided object.
+#' @return An object of class \code{tbl_df} (tibble) summarizing the provided
+#' object.
 #' @seealso \code{\link{build_table}}
 #' @examples
 #' library(dplyr)
@@ -394,12 +394,12 @@ build_table.lm <- function(
 
   # Assignments
   assignments <- .create_assigns(
-    x = c('(Intercept)', attr(stats::terms(.object), 'term.labels')),
+    x = c('(Intercept)', attr(terms(.object), 'term.labels')),
     y = .object$assign
   )
 
   # Column selection
-  terms <- if (length(rlang::enexprs(...)) > 0) {
+  terms <- if (rlang::dots_n(...) > 0) {
     tidyselect::eval_select(expr = rlang::expr(c(...)), data = assignments)
   } else {
     rlang::set_names(
@@ -419,17 +419,17 @@ build_table.lm <- function(
   names(assignments) <- names(terms)
 
   # Check test argument
-  prefer.tests <- methods::hasArg(.test)
+  prefer.tests <- '.test' %in% names(match.call())
   .test <- match.arg(.test)
 
   # Tabulate & format estimates
-  estimates <- cbind(
-    summary(.object)$coefficients,
-    stats::confint(.object, level = .level)
+  estimates <- as.data.frame(
+    cbind(
+      summary(.object)$coefficients,
+      stats::confint(.object, level = .level)
+    )
   )
-  estimates[,c(1,3,5,6)] <- as.character(
-    round(estimates[,c(1,3,5,6)], digits = .digits)
-  )
+  estimates[,-4] <- round(estimates[,-4], digits = .digits)
   estimates[,4] <- format.pval(
     pv = estimates[,4],
     digits = .digits,
@@ -438,18 +438,17 @@ build_table.lm <- function(
     scientific = F,
     na.form = ''
   )
+  estimates[] <- lapply(estimates, as.character)
 
   # Tabulate & format special tests
-  tests <- stats::drop1(
-    .object,
-    test = .test
+  tests <- as.data.frame(
+    stats::drop1(
+      .object,
+      test = .test
+    )
   )[terms + 1, if (.test == 'Chisq') 5 else 5:6]
-  if (.test == 'F') {
-    tests[,1] <- as.character(round(tests[,1], digits = .digits))
-  } else {
-    tests <- cbind(stat = '', tests)
-    tests[,1] <- as.character(tests[,1])
-  }
+  if (.test == 'F') tests[,-2] <- round(tests[,-2], digits = .digits)
+  else tests <- cbind(stat = '', tests)
   tests[,2] <- format.pval(
     pv = tests[,2],
     digits = .digits,
@@ -458,6 +457,7 @@ build_table.lm <- function(
     scientific = F,
     na.form = ''
   )
+  tests[] <- lapply(tests, as.character)
 
   # Generate table
   table <- purrr::imap_dfr(
@@ -469,104 +469,83 @@ build_table.lm <- function(
       single_level <- (has_levels <- !is.null(names(w))) & length(w) == 2
       if (single_level) w <- w[-1] # Ignore reference level of a 2-level
 
-      row <- c(
-        list(
+      cols <- list()
 
-          # Variable name
-          Variable = if (single_level) paste0(x, ', ', names(w)) else x,
+      # Variable name
+      cols$Variable <- if (single_level) paste0(x, ', ', names(w)) else x
 
-          # Effect estimate & CI
-          'HR [CI]' = if (!has_levels | single_level) {
-            paste(
-              estimates[w, 1],
-              if (all(!is.na(estimates[w, 5:6]))) {
-                paste0('[', estimates[w, 5], '-', estimates[w, 6], ']')
-              } else '[NA]'
-            )
-          } else ''
-
-        ),
-
-        # Report test
-        if (.show.test) {
-          list(
-            Test =
-              if ((prefer.tests & x != '(Intercept)') | (has_levels & !single_level)) {
-                if(.test == 'F') 'F-stat' else .test
-              } else 't-value',
-            Statistic =
-              if ((prefer.tests & x != '(Intercept)') | (has_levels & !single_level)) {
-                tests[match(x, names(assignments)), 1]
-              } else estimates[w, 3]
-          )
-        },
-
-        # p-value
-        list(
-          p = if ((prefer.tests & x != '(Intercept)') | (has_levels & !single_level)) {
-            tests[match(x, names(assignments)), 2]
-          } else estimates[w, 4]
+      # Effect estimate & CI
+      cols$`HR [CI]` <- if (!has_levels | single_level) {
+        paste(
+          estimates[w, 1],
+          if (all(!is.na(estimates[w, 5:6]))) {
+            paste0('[', estimates[w, 5], '-', estimates[w, 6], ']')
+          } else '[NA]'
         )
+      } else ''
 
-      )
+      # p-value
+      cols$p <- if ((prefer.tests & x != '(Intercept)') | (has_levels & !single_level)) {
+        tests[match(x, names(assignments)), 2]
+      } else estimates[w, 4]
+
+      # Report test
+      if (.show.test) {
+
+          cols$Test <-
+            if ((prefer.tests & x != '(Intercept)') | (has_levels & !single_level)) {
+              if(.test == 'F') 'F-stat' else .test
+            } else 't-value'
+
+          cols$Statistic <-
+            if ((prefer.tests & x != '(Intercept)') | (has_levels & !single_level)) {
+              tests[match(x, names(assignments)), 1]
+            } else estimates[w, 3]
+
+      }
 
       # Generate factor level rows
       if (has_levels & !single_level) {
 
-        dplyr::bind_rows(
-          row,
-
-          # Reference level
-          list(
-            Variable = paste('  ', names(w[1])),
-            'HR [CI]' = 'Reference'
-          ),
-
-          # Map level assignments
-          c(
-            list(
-
-              # Factor level name
-              Variable = paste('  ', names(w[-1])),
-
-              # Effect estimate and CI
-              'HR [CI]' = paste(
-                estimates[w[-1], 1],
-                ifelse(
-                  !is.na(estimates[w[-1], 5]) & !is.na(estimates[w[-1], 6]),
-                  paste0('[', estimates[w[-1], 5], '-', estimates[w[-1], 6], ']'),
-                  '[NA]'
-                )
-              ),
-
-              # Level p-value
-              p = estimates[w[-1], 4]
-
-            ),
-
-            # Report test
-            if (.show.test) {
-              list(
-                Test = rep('t-value', length(w[-1])),
-                Statistic = estimates[w[-1], 3]
-              )
-            }
-
-          )
-
+        # Level names
+        cols$Variable <- c(
+          cols$Variable,
+          paste('  ', names(w))
         )
 
-      } else row
+        # Effect estimate and CI
+        cols$`HR [CI]` = c(
+          cols$`HR [CI]`,
+          'Reference',
+          paste(
+            estimates[w[-1], 1],
+            ifelse(
+              !is.na(estimates[w[-1], 5]) & !is.na(estimates[w[-1], 6]),
+              paste0('[', estimates[w[-1], 5], '-', estimates[w[-1], 6], ']'),
+              '[NA]'
+            )
+          )
+        )
+
+        # Level p-value
+        cols$p <- c(cols$p, '', estimates[w[-1], 4])
+
+        # Report test
+        if (.show.test) {
+          cols$Test <- c(cols$Test, '',  rep('t-value', length(w[-1])))
+          cols$Statistic <- c(cols$Statistic, '', estimates[w[-1], 3])
+        }
+
+      }
+
+      # Return data
+      dplyr::as_tibble(cols)
 
     }
   )
 
-  table
-
-  # Replace return table
+  # Replace NA's & return
   .replace_na(table)
 
 }
-
-
 

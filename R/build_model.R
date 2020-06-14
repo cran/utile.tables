@@ -1,12 +1,12 @@
 #' @title Build models
 #' @description Models specified terms in model data against an existing model
 #' and returns a clean, human readable table of summarizing the effects and
-#' statistics for the newly generated model. This functions greatly simplifies
+#' statistics for the newly generated model. This function is meant to simplify
 #' fitting a large number of variables against a set of time-to-event data.
 #' @param .object An object of a supported class. See S3 methods below.
 #' @param ... Arguments passed to the appropriate S3 method.
-#' @return A \code{\link[tibble:tibble]{tibble::tibble()}} summarizing the
-#' provided object.
+#' @return An object of class \code{tbl_df} (tibble) summarizing the provided
+#' object.
 #' @seealso \code{\link{build_model.coxph}}
 #' @export
 build_model <- function(.object, ...) { UseMethod('build_model') }
@@ -28,7 +28,7 @@ build_model.default <- function (.object, ...) {
 #' @param ... One or more unquoted expressions separated by commas representing
 #' columns in the model data.frame. May be specified using
 #' \code{\link[tidyselect:select_helpers]{tidyselect helpers}}.
-#' @param .mv A logical. Fit all terms into a single multivariate model. If left
+#' @param .mv A logical. Fit all terms into a single multivariable model. If left
 #' FALSE, all terms are fit in their own univariate models.
 #' @param .test A character. The name of a \code{\link[stats:add1]{stats::drop1}}
 #' test to use with the model.
@@ -41,8 +41,8 @@ build_model.default <- function (.object, ...) {
 #' @param .p.digits An integer. The number of p-value digits to report. Note
 #' that the p-value still rounded to the number of digits specified in
 #' \code{.digits}.
-#' @return A \code{\link[tibble:tibble]{tibble::tibble()}} summarizing the
-#' new models.
+#' @return An object of class data.frame summarizing the provided object. If the
+#' \code{tibble} package has been installed, a tibble will be returned.
 #' @seealso \code{\link{build_model}}
 #' @examples
 #' library(survival)
@@ -55,7 +55,7 @@ build_model.default <- function (.object, ...) {
 #' fit <- coxph(Surv(time, status) ~ 1, data = data_lung)
 #'
 #' # Create a univariate model for each variable
-#' build_model(.object = fit, sex, age)
+#' fit %>% build_model(sex, age)
 #' @export
 build_model.coxph <- function(
   .object,
@@ -74,20 +74,18 @@ build_model.coxph <- function(
 
   # Retrieve data.frame from call
   data <- eval(.object$call$data)
-  base_formula <- deparse(stats::formula(.object))
+  base_formula <- stats::formula(.object)
 
   # Column selection
-  terms <- if (length(rlang::enexprs(...)) > 0) {
+  terms <- if (rlang::dots_n(...) > 0) {
     tidyselect::eval_select(expr = rlang::expr(c(...)), data = data)
   } else {
     rlang::set_names(x = 1:length(names(data)), nm = names(data))
   }
 
-  # Ignore terms already in fit
-  terms <- terms[!(names(terms) %in% all.vars(.object))]
-
   # Ignore unusable terms
   terms <- terms[
+    !(names(terms) %in% all.vars(base_formula)) &
     purrr::imap_lgl(
       terms,
       ~ {
@@ -97,6 +95,9 @@ build_model.coxph <- function(
       }
     )
   ]
+
+  # Convert formula to character
+  base_formula <- deparse(base_formula)
 
   # build_table factory with pre-specified defaults
   build_table_ <- function(...) {
@@ -114,10 +115,10 @@ build_model.coxph <- function(
   # Refit model and build summary table
   if (!.mv) {
 
-    # Univariate modelling
+    # Univariable modelling
     purrr::imap_dfr(
       terms,
-      ~ {
+        ~ {
         build_table_(
           .object = .refit_model(
             x = .object,
@@ -130,7 +131,7 @@ build_model.coxph <- function(
 
   } else {
 
-    # Multivariate modelling
+    # Multivariable modelling
     build_table_(
       .object = .refit_model(
         x = .object,
