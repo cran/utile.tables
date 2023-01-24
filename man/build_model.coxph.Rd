@@ -9,9 +9,9 @@
   ...,
   .mv = FALSE,
   .test = c("LRT", "Wald"),
-  .show.test = FALSE,
+  .col.test = FALSE,
   .level = 0.95,
-  .percent.sign = TRUE,
+  .stat.pct.sign = TRUE,
   .digits = 1,
   .p.digits = 4
 )
@@ -29,12 +29,12 @@ FALSE, all terms are fit in their own univariate models.}
 \item{.test}{A character. The name of a \code{\link[stats:add1]{stats::drop1}}
 test to use with the model.}
 
-\item{.show.test}{A logical. Append a columns for the test and accompanying
+\item{.col.test}{A logical. Append a columns for the test and accompanying
 statistic used to derive the p-value.}
 
 \item{.level}{A double. The confidence level required.}
 
-\item{.percent.sign}{A logical. Paste a percent symbol after all reported
+\item{.stat.pct.sign}{A logical. Paste a percent symbol after all reported
 frequencies.}
 
 \item{.digits}{An integer. The number of digits to round numbers to.}
@@ -57,14 +57,14 @@ fitting a large number of variables against a set of time-to-event data.
 library(survival)
 library(dplyr)
 
-data_lung <- lung \%>\%
-  mutate_at(vars(inst, status, sex), as.factor) \%>\%
+data_lung <- lung |>
+  mutate_at(vars(inst, status, sex), as.factor) |>
   mutate(status = case_when(status == 1 ~ 0, status == 2 ~ 1))
 
 fit <- coxph(Surv(time, status) ~ 1, data = data_lung)
 
 # Create a univariate model for each variable
-fit \%>\% build_model(sex, age)
+fit |> build_model(sex, age)
 }
 \seealso{
 \code{\link{build_model}}

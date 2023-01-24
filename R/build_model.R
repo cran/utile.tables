@@ -9,7 +9,7 @@
 #' object.
 #' @seealso \code{\link{build_model.coxph}}
 #' @export
-build_model <- function(.object, ...) { UseMethod('build_model') }
+build_model <- function (.object, ...) { UseMethod('build_model') }
 
 
 #' @export
@@ -32,10 +32,10 @@ build_model.default <- function (.object, ...) {
 #' FALSE, all terms are fit in their own univariate models.
 #' @param .test A character. The name of a \code{\link[stats:add1]{stats::drop1}}
 #' test to use with the model.
-#' @param .show.test A logical. Append a columns for the test and accompanying
+#' @param .col.test A logical. Append a columns for the test and accompanying
 #' statistic used to derive the p-value.
 #' @param .level A double. The confidence level required.
-#' @param .percent.sign A logical. Paste a percent symbol after all reported
+#' @param .stat.pct.sign A logical. Paste a percent symbol after all reported
 #' frequencies.
 #' @param .digits An integer. The number of digits to round numbers to.
 #' @param .p.digits An integer. The number of p-value digits to report. Note
@@ -48,23 +48,23 @@ build_model.default <- function (.object, ...) {
 #' library(survival)
 #' library(dplyr)
 #'
-#' data_lung <- lung %>%
-#'   mutate_at(vars(inst, status, sex), as.factor) %>%
+#' data_lung <- lung |>
+#'   mutate_at(vars(inst, status, sex), as.factor) |>
 #'   mutate(status = case_when(status == 1 ~ 0, status == 2 ~ 1))
 #'
 #' fit <- coxph(Surv(time, status) ~ 1, data = data_lung)
 #'
 #' # Create a univariate model for each variable
-#' fit %>% build_model(sex, age)
+#' fit |> build_model(sex, age)
 #' @export
-build_model.coxph <- function(
+build_model.coxph <- function (
   .object,
   ...,
   .mv = FALSE,
   .test = c('LRT', 'Wald'),
-  .show.test = FALSE,
+  .col.test = FALSE,
   .level = 0.95,
-  .percent.sign = TRUE,
+  .stat.pct.sign = TRUE,
   .digits = 1,
   .p.digits = 4
 ) {
@@ -100,13 +100,13 @@ build_model.coxph <- function(
   base_formula <- deparse(base_formula)
 
   # build_table factory with pre-specified defaults
-  build_table_ <- function(...) {
+  build_table_ <- function (...) {
     build_table(
       ...,
       .test = .test,
-      .show.test = .show.test,
+      .col.test = .col.test,
       .level = .level,
-      .percent.sign = .percent.sign,
+      .stat.pct.sign = .stat.pct.sign,
       .digits = .digits,
       .p.digits = .p.digits
     )
@@ -116,17 +116,19 @@ build_model.coxph <- function(
   if (!.mv) {
 
     # Univariable modelling
-    purrr::imap_dfr(
-      terms,
-        ~ {
-        build_table_(
-          .object = .refit_model(
-            x = .object,
-            formula = paste(base_formula, .y, sep = ' + ')
-          ),
-          !! .y
-        )
-      }
+    purrr::list_rbind(
+      purrr::imap(
+        terms,
+          ~ {
+          build_table_(
+            .object = .refit_model(
+              x = .object,
+              formula = paste(base_formula, .y, sep = ' + ')
+            ),
+            !! .y
+          )
+        }
+      )
     )
 
   } else {

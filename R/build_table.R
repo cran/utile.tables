@@ -8,7 +8,7 @@
 #' \code{\link{build_table.coxph}},
 #' \code{\link{build_table.lm}}
 #' @export
-build_table <- function(.object, ...) { UseMethod('build_table') }
+build_table <- function (.object, ...) { UseMethod('build_table') }
 
 
 #' @export
@@ -26,30 +26,39 @@ build_table.default <- function (.object, ...) {
 #' columns in the data.frame. May be specified using
 #' \code{\link[tidyselect:select_helpers]{tidyselect helpers}}. If left empty,
 #' all columns are summarized.
-#' @param .by An unquoted expression. Optional. The data column to stratify the
+#' @param .by An unquoted expression. The data column to stratify the
 #' summary by.
-#' @param .inverse A logical. Optional. For logical data, report the frequency
+#' @param .inverse A logical. For logical data, report the frequency
 #' of FALSE values instead of the TRUE.
-#' @param .append.stat A logical. Optionla. Append the type of summary statistic
+#' @param .label.stat A logical. Append the type of summary statistic
 #' to the column label.
-#' @param .parametric A logical. Optional. Use parametric testing.
-#' @param .show.missing A logical. Optional. Append a column listing the
-#' frequencies of missing data for each row.
-#' @param .show.test A logical. Optional. Append a column containing the test
-#' each p-value was derived from.
-#' @param .na.rm A logical. Optional. Ignore NA values when calculating
-#' frequencies for logical and factor data types.
-#' @param .percent.sign A logical. Optional. Paste a percent symbol after all
+#' @param .stat A character. Name of the summary statistic to use for numeric data.
+#' Supported options include the mean ('mean') and median ('median').
+#' @param .stat.pct.sign A logical. Paste a percent symbol after all
 #' reported frequencies.
-#' @param .digits An integer. Optional. The number of digits to round numbers to.
-#' @param .p.digits An integer. Optional. The number of p-value digits to report.
+#' @param .col.overall A logical. Append a column with the statistic for all data.
+#' If \code{.by} is not specified, this parameter is ignored.
+#' @param .col.missing A logical. Append a column listing the
+#' frequencies of missing data for each row.
+#' @param .test.continuous A character. A character. Name of statistical test to compare groups.
+#' Supported options include ANOVA linear model ('anova'), Kruskal-Wallis ('kruskal'),
+#' and Wilcoxon rank sum ('wilcoxon') tests.
+#' @param .test.nominal A character. Name of statistical test to compare groups.
+#' Supported options include Pearson's Chi-squared Test ('chisq') and Fisher's
+#' Exact Test ('fisher').
+#' @param .test.simulate.p A logical. Whether to use Monte Carlo simulation of
+#' the p-value when testing nominal data.
+#' @param .col.test A logical. Append a column containing the test
+#' each p-value was derived from.
+#' @param .digits An integer. The number of digits to round numbers to.
+#' @param .p.digits An integer. The number of p-value digits to report.
 #' @return An object of class \code{tbl_df} (tibble) summarizing the provided
 #' object.
 #' @seealso \code{\link{build_table}}
 #' @examples
 #' # Sample data
 #' df <- data.frame(
-#'   strata = factor(sample(letters[1:3], 1000, replace = TRUE)),
+#'   strata = factor(sample(letters[2:3], 1000, replace = TRUE)),
 #'   numeric = sample(1:100, 1000, replace = TRUE),
 #'   numeric2 = sample(1:100, 1000, replace = TRUE),
 #'   factor = factor(sample(1:5, 1000, replace = TRUE)),
@@ -60,22 +69,30 @@ build_table.default <- function (.object, ...) {
 #' build_table(df, .by = strata)
 #'
 #' # Summarize & rename selected columns
-#' build_table(df, Numeric = numeric2, Factor = factor, .by = strata)
+#' build_table(df, numeric2, factor, .by = strata)
 #' @export
-build_table.data.frame <- function(
+build_table.data.frame <- function (
   .object,
   ...,
   .by,
   .inverse = FALSE,
-  .append.stat = TRUE,
-  .parametric = FALSE,
-  .show.missing = FALSE,
-  .show.test = FALSE,
-  .na.rm = TRUE,
-  .percent.sign = TRUE,
+  .label.stat = TRUE,
+  .stat = c('mean', 'median'),
+  .stat.pct.sign = FALSE,
+  .col.overall = TRUE,
+  .col.missing = FALSE,
+  .test.continuous = c('anova', 'kruskal', 'wilcoxon'),
+  .test.nominal = c('chisq', 'fisher'),
+  .test.simulate.p = FALSE,
+  .col.test = FALSE,
   .digits = 1,
   .p.digits = 4
 ) {
+
+  # Match arguments
+  .stat <- match.arg(.stat)
+  .test.continuous <- match.arg(.test.continuous)
+  .test.nominal <- match.arg(.test.nominal)
 
   # Column selection
   cols <- if (rlang::dots_n(...) > 0) {
@@ -110,13 +127,14 @@ build_table.data.frame <- function(
       x = x,
       y = if (length(by) == 1) .object[[by]],
       ...,
+      label.stat = .label.stat,
       inverse = .inverse,
-      append.stat = .append.stat,
-      parametric = .parametric,
-      show.missing = .show.missing,
-      show.test = .show.test,
-      na.rm = .na.rm,
-      percent.sign = .percent.sign,
+      stat = .stat,
+      stat.pct.sign = .stat.pct.sign,
+      col.overall = .col.overall,
+      col.missing = .col.missing,
+      test.simulate.p = .test.simulate.p,
+      col.test = .col.test,
       digits = .digits,
       p.digits = .p.digits
     )
@@ -125,7 +143,18 @@ build_table.data.frame <- function(
   # Create table
   table <- dplyr::bind_rows(
     build_row_(x = .object),
-    purrr::imap_dfr(cols, ~ build_row_(x = .object[[.x]], label = .y))
+    purrr::list_rbind(
+      purrr::imap(
+        cols, ~ {
+          build_row_(
+            x = .object[[.x]],
+            label = .y,
+            test = if (inherits(.object[[.x]], c('factor', 'logical'))) .test.nominal
+              else .test.continuous
+          )
+        }
+      )
+    )
   )
 
   # Replace NA's & return table
@@ -143,11 +172,12 @@ build_table.data.frame <- function(
 #' \code{\link[tidyselect:select_helpers]{tidyselect helpers}}. If left empty,
 #' all terms are summarized.
 #' @param .test A character. The name of the
-#' \code{\link[stats:add1]{stats::drop1}} test to use with the model.
-#' @param .show.test A logical. Append a columns for the test and accompanying
+#' \code{\link[stats:add1]{stats::drop1}} test to use with the model. Supported
+#' tests include Wald's Test ('Wald') and Likelihood Ratio Test ('LRT').
+#' @param .col.test A logical. Append a columns for the test and accompanying
 #' statistic used to derive the p-value.
 #' @param .level A double. The confidence level required.
-#' @param .percent.sign A logical. Paste a percent symbol after all reported
+#' @param .stat.pct.sign A logical. Paste a percent symbol after all reported
 #' frequencies.
 #' @param .digits An integer. The number of digits to round numbers to.
 #' @param .p.digits An integer. The number of p-value digits to report. Note
@@ -160,21 +190,21 @@ build_table.data.frame <- function(
 #' library(survival)
 #' library(dplyr)
 #'
-#' data_lung <- lung %>%
-#'   mutate_at(vars(inst, status, sex), as.factor) %>%
+#' data_lung <- lung |>
+#'   mutate_at(vars(inst, status, sex), as.factor) |>
 #'   mutate(status = case_when(status == 1 ~ 0, status == 2 ~ 1))
 #'
 #' fit <- coxph(Surv(time, status) ~ sex + meal.cal, data = data_lung)
 #'
-#' fit %>% build_table(Sex = sex, Calories = meal.cal, .test = 'LRT')
+#' fit |> build_table(Sex = sex, Calories = meal.cal, .test = 'LRT')
 #' @export
-build_table.coxph <- function(
+build_table.coxph <- function (
   .object,
   ...,
   .test = c('LRT', 'Wald'),
-  .show.test = FALSE,
+  .col.test = FALSE,
   .level = 0.95,
-  .percent.sign = TRUE,
+  .stat.pct.sign = TRUE,
   .digits = 1,
   .p.digits = 4
 ) {
@@ -193,7 +223,7 @@ build_table.coxph <- function(
   assignments <- purrr::imap(
     .object$assign[terms], ~ {
       if (.y %in% names(.object$xlevels)) {
-        rlang::set_names(x = c(as.integer(NA), .x), nm = .object$xlevels[[.y]])
+        rlang::set_names(x = c(NA_real_, .x), nm = .object$xlevels[[.y]])
       } else .x
     }
   )
@@ -245,7 +275,7 @@ build_table.coxph <- function(
 
 
   # Generate table
-  table <- purrr::imap_dfr(
+  table <- purrr::imap(
     assignments,
     function (w, x) {
 
@@ -281,7 +311,7 @@ build_table.coxph <- function(
       } else estimates[w, 5]
 
       # Report test
-      if (.show.test) {
+      if (.col.test) {
 
         cols$Test <-
           if ((prefer.tests & .test == 'LRT') | (has_levels & !single_level)) {
@@ -326,10 +356,9 @@ build_table.coxph <- function(
         cols$p <- c(cols$p, '', estimates[w[-1], 5])
 
         # Report test
-        if (.show.test) {
+        if (.col.test) {
 
           cols$Test <- c(cols$Test, '', rep('Wald', length(w[-1])))
-
           cols$Statistic <- c(cols$Statistic, '', estimates[w[-1], 4])
 
         }
@@ -341,6 +370,9 @@ build_table.coxph <- function(
 
     }
   )
+
+  # Concatonate rows
+  table <- purrr::list_rbind(table)
 
   # Replace NA's
   .replace_na(table)
@@ -357,11 +389,12 @@ build_table.coxph <- function(
 #' \code{\link[tidyselect:select_helpers]{tidyselect helpers}}. If left empty,
 #' all terms are summarized.
 #' @param .test A character. The name of the
-#' \code{\link[stats:add1]{stats::drop1}} test to use with the model.
-#' @param .show.test A logical. Append a columns for the test and accompanying
+#' \code{\link[stats:add1]{stats::drop1}} test to use with the model. Supported
+#' options include the F-Test ('F') and Chi-squared Test ('Chisq').
+#' @param .col.test A logical. Append a columns for the test and accompanying
 #' statistic used to derive the p-value.
 #' @param .level A double. The confidence level required.
-#' @param .percent.sign A logical. Paste a percent symbol after all reported
+#' @param .stat.pct.sign A logical. Paste a percent symbol after all reported
 #' frequencies.
 #' @param .digits An integer. The number of digits to round numbers to.
 #' @param .p.digits An integer. The number of p-value digits to report. Note
@@ -373,21 +406,21 @@ build_table.coxph <- function(
 #' @examples
 #' library(dplyr)
 #'
-#' data_mtcars <- datasets::mtcars %>%
-#'   mutate_at(vars('vs', 'am'), as.logical) %>%
+#' data_mtcars <- datasets::mtcars |>
+#'   mutate_at(vars('vs', 'am'), as.logical) |>
 #'   mutate_at(vars('gear', 'carb', 'cyl'), as.factor)
 #'
 #' fit <- lm(mpg ~ vs + drat + cyl, data = data_mtcars)
 #'
-#' fit %>% build_table()
+#' fit |> build_table()
 #' @export
-build_table.lm <- function(
+build_table.lm <- function (
   .object,
   ...,
   .test = c('F', 'Chisq'),
-  .show.test = FALSE,
+  .col.test = FALSE,
   .level = 0.95,
-  .percent.sign = TRUE,
+  .stat.pct.sign = TRUE,
   .digits = 1,
   .p.digits = 4
 ) {
@@ -412,7 +445,7 @@ build_table.lm <- function(
   assignments <- purrr::imap(
     assignments[terms], ~ {
       if (.y %in% names(.object$xlevels)) {
-        rlang::set_names(x = c(as.integer(NA), .x), nm = .object$xlevels[[.y]])
+        rlang::set_names(x = c(NA_real_, .x), nm = .object$xlevels[[.y]])
       } else .x
     }
   )
@@ -460,7 +493,7 @@ build_table.lm <- function(
   tests[] <- lapply(tests, as.character)
 
   # Generate table
-  table <- purrr::imap_dfr(
+  table <- purrr::imap(
     assignments,
 
     # Map assignments
@@ -490,17 +523,17 @@ build_table.lm <- function(
       } else estimates[w, 4]
 
       # Report test
-      if (.show.test) {
+      if (.col.test) {
 
-          cols$Test <-
-            if ((prefer.tests & x != '(Intercept)') | (has_levels & !single_level)) {
-              if(.test == 'F') 'F-stat' else .test
-            } else 't-value'
+        cols$Test <-
+          if ((prefer.tests & x != '(Intercept)') | (has_levels & !single_level)) {
+            if(.test == 'F') 'F-stat' else .test
+          } else 't-value'
 
-          cols$Statistic <-
-            if ((prefer.tests & x != '(Intercept)') | (has_levels & !single_level)) {
-              tests[match(x, names(assignments)), 1]
-            } else estimates[w, 3]
+        cols$Statistic <-
+          if ((prefer.tests & x != '(Intercept)') | (has_levels & !single_level)) {
+            tests[match(x, names(assignments)), 1]
+          } else estimates[w, 3]
 
       }
 
@@ -531,7 +564,7 @@ build_table.lm <- function(
         cols$p <- c(cols$p, '', estimates[w[-1], 4])
 
         # Report test
-        if (.show.test) {
+        if (.col.test) {
           cols$Test <- c(cols$Test, '',  rep('t-value', length(w[-1])))
           cols$Statistic <- c(cols$Statistic, '', estimates[w[-1], 3])
         }
@@ -543,6 +576,9 @@ build_table.lm <- function(
 
     }
   )
+
+  # Concatenate rows
+  table <- purrr::list_rbind(table)
 
   # Replace NA's & return
   .replace_na(table)
